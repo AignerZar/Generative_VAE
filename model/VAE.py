@@ -11,7 +11,7 @@ import pandas as pd
 import torch.nn.functional as F
 import re
 from sklearn.model_selection import train_test_split
-
+import config
 from model.encoder import Encoder
 from model.decoder import Decoder_new, Decoder
 
@@ -20,7 +20,7 @@ class VAE(nn.Module):
     def __init__(self, input_dim, latent_dim, P, num_atoms, edge_index):
         super().__init__()
         self.encoder = Encoder(latent_dim, P, num_atoms, edge_index)
-        self.decoder = Decoder_new(latent_dim=latent_dim, P=15, num_atoms=3, edge_index=edge_index, hidden_dim=64, num_layers=4)
+        self.decoder = Decoder_new(latent_dim=latent_dim, P=config.P, num_atoms=3, edge_index=edge_index, hidden_dim=64, num_layers=4)
 
     # reparametrize function to make it trainable with the backpropagation  
     def reparameterize(self, mu, logvar):
