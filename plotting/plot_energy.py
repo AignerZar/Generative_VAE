@@ -1,5 +1,6 @@
 """
 File for plotting the energy distribution of the data, once for the original data, once for the reconstruted data and once for the generated data
+Useless file -> see tge folder evaluation instead -> energy must be computed by kinetic estimator and gaussian computations
 """
 import torch
 import torch.nn as nn
