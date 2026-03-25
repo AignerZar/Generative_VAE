@@ -18,7 +18,7 @@ def build_edge_index(P, num_atoms):
     # Bauen der Kanten, wobei es die Kanten (O-H1,H1-O) und die Kanten zwischen den Timesamples gibt
     edges = []
 
-    # Kanten zwischen den Atome des H2O molecules
+    # Kanten zwischen den Atome des H2O molecules, wichtig die position der atome sieht man in der xyz file gut dann weiß man welche indizes die einzelnen atome in der csv file haben
     for b in range(P):
         H1 = num_atoms * b + 0
         O = num_atoms * b + 1
