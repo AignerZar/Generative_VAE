@@ -3,6 +3,7 @@ File for the EGCL class
 EGCL is an equivariant graph convolution layer with is äquivariant again transformation of the euclidean group
 -> translation, rotation and symmetry
 therefore often used in physics as the physical properties remain correct during training
+As a reference I want to refer to the paper "E(n) Equivariant Graph Neural Networks" from Victor Garcia Satorras, Emiel Hoogeboom, Max Welling
 """
 import torch
 import torch.nn as nn
