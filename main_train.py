@@ -40,4 +40,4 @@ loss_history = train(model, train_loader, val_loader, optimizer, config)
 #train(model, train_loader, val_loader, optimizer, config)
 torch.save(model.state_dict(), "vae_h2o.pt")
 
-plot_loss(loss_history, outfile="loss_plot.pdf")
+plot_loss(loss_history, outfile="loss_plot.pdf")    # adjusting all the names and storing everything separatedly 
