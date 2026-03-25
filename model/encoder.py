@@ -1,5 +1,5 @@
 """
-File to define the encoder of the VAE
+File to define the encoder of the VAE, later used in VAE.py
 here the EGCL is used in the encoder, meaning the properties are remained, same later used for the decoder
 """
 import torch
