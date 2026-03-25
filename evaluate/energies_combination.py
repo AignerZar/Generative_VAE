@@ -71,7 +71,3 @@ with open(output_file, "w", newline="") as f:
         Vavg = Vavg_by_cfg[cfg]
         Etot = K + Vavg
         w.writerow([cfg, K, Vavg, Etot])
-
-print(f"Done. Wrote {len(common_cfgs)} rows to {output_file}")
-print(f"Example row: cfg={common_cfgs[0]}  K={K_by_cfg[common_cfgs[0]]:.12e}  "
-      f"Vavg={Vavg_by_cfg[common_cfgs[0]]:.12e}  E={K_by_cfg[common_cfgs[0]]+Vavg_by_cfg[common_cfgs[0]]:.12e}")
