@@ -59,26 +59,26 @@ model.eval()
 mu, logvar, z = compute_latent(model, data_tensor, config.device)
 mu_tensor = torch.tensor(mu, dtype=torch.float32)
 
-np.savetxt("latent_mu.csv", mu, delimiter=",")
+np.savetxt("latent_mu_5000MC.csv", mu, delimiter=",")
 
 # generate the structure
 z_samples = sample_from_aggregated_posterior(mu_tensor, config.num_samples, config.device)
 x_gen_norm, x_gen_denorm = generate_from_latent(model, z_samples, mean, std, config.device)
 
-np.savetxt("generated_norm.csv", x_gen_norm, delimiter=",")
-np.savetxt("generated_denorm.csv", x_gen_denorm, delimiter=",")
+np.savetxt("generated_norm_5000MC.csv", x_gen_norm, delimiter=",")
+np.savetxt("generated_denorm_5000MC.csv", x_gen_denorm, delimiter=",")
 
 # energy distribution
 E_true = compute_energy_distribution_original(data_tensor, P, num_atoms, denorm_flat)
 E_rec  = compute_energy_distribution_reconstructed(model, data_tensor, P, num_atoms, config.device, denorm_flat)
-E_gen  = compute_energy_distribution_generated(model, 500, config.latent_dimension, P, num_atoms, config.device, denorm_flat)
+E_gen  = compute_energy_distribution_generated(model, 11000, config.latent_dimension, P, num_atoms, config.device, denorm_flat)
 
 plot_energy_distributions(E_true, E_rec, E_gen)
 
 # geometries
 dist_original = get_distributions(data_tensor, P, num_atoms, mode="original", denorm_func=denorm_flat)
 dist_recon    = get_distributions(data_tensor, P, num_atoms, model=model, mode="reconstructed", device=config.device, denorm_func=denorm_flat)
-dist_generated = get_distributions(data_tensor, P, num_atoms, model=model, mode="generated", device=config.device, n_samples=500, denorm_func=denorm_flat)
+dist_generated = get_distributions(data_tensor, P, num_atoms, model=model, mode="generated", device=config.device, n_samples=11000, denorm_func=denorm_flat)
 
 plot_bond_angle_distributions(dist_original, dist_recon, dist_generated)
 plot_bond_angle_distributions_with_kde(dist_original, dist_recon, dist_generated)
