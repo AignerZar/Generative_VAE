@@ -18,7 +18,7 @@ font2 = {'family':'sans-serif','color':'black','size':20}
 
 plt.rcParams['text.usetex'] = True #LaTeX
 
-def plot_bond_angle_distributions(dist_original, dist_rec, dist_gen, outfile="bond_angle_distributions.pdf"):
+def plot_bond_angle_distributions(dist_original, dist_rec, dist_gen, outfile="bond_angle_distributions_5000MC.pdf"):
     (r1_o, r2_o, ang_o) = dist_original
     (r1_r, r2_r, ang_r) = dist_rec
     (r1_g, r2_g, ang_g) = dist_gen
@@ -55,7 +55,7 @@ def plot_bond_angle_distributions(dist_original, dist_rec, dist_gen, outfile="bo
     plt.show()
 
 def plot_bond_angle_distributions_with_kde(dist_original, dist_rec, dist_gen,
-                                           outfile="bond_angle_distributions_kde.pdf"):
+                                           outfile="bond_angle_distributions_kde_5000MC.pdf"):
     """
     Creates a separate figure with histogram + KDE curves
     for Original / Reconstructed / Generated distributions.
@@ -154,7 +154,7 @@ def print_distribution_means(dist_original, dist_recon, dist_generated):
 
 
 def plot_bond_angle_distributions_mix(dist_original, dist_rec, dist_gen,
-                                      outfile="bond_angle_distributions_mix.pdf"):
+                                      outfile="bond_angle_distributions_mix_5000MC.pdf"):
 
     (r1_o, r2_o, ang_o) = dist_original
     (r1_r, r2_r, ang_r) = dist_rec
@@ -285,7 +285,7 @@ def print_distribution_stats(dist_original, dist_recon, dist_generated, ddof=1, 
         print()
 
 def plot_bond_angle_kde_only(dist_original, dist_rec, dist_gen,
-                            outfile="bond_angle_kde_only.pdf",
+                            outfile="bond_angle_kde_only_5000MC.pdf",
                             bw_method=None, npoints=400, xlim_quantiles=(0.5, 99.5)):
     """
     KDE-only plot: only smooth KDE lines (no histogram).
