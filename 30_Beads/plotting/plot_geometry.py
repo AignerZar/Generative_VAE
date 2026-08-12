@@ -81,7 +81,7 @@ def plot_bond_angle_distributions_with_kde(dist_original, dist_rec, dist_gen,
             # Histogram
             h = ax.hist(data, bins=70, density=True, alpha=0.3, color=color, label=f"{label} (hist)")
 
-            # KDE-Fit (smooth curve)
+            # KDE-Fit (smooth curve) -> for visualizaton
             kde = gaussian_kde(data)
             xs = np.linspace(min(data), max(data), 300)
             p, = ax.plot(xs, kde(xs), color=color, lw=2, label=f"{label} (fit)")
@@ -112,7 +112,7 @@ def plot_bond_angle_distributions_with_kde(dist_original, dist_rec, dist_gen,
         subplot=2
     )
 
-    # ---- Angle ----
+    # ---- Angles ----
     plot_hist_kde(
         data_list=[ang_o, ang_r, ang_g],
         labels=[r"Original $\mathrm{H_2O}$", r"Reconstructed $\mathrm{H_2O}$", r"Generated $\mathrm{H_2O}$"],
@@ -173,17 +173,16 @@ def plot_bond_angle_distributions_mix(dist_original, dist_rec, dist_gen,
                   r"Reconstructed $\mathrm{H_2O}$",
                   r"Generated $\mathrm{H_2O}$"]
 
-        # --- Plot Histograms (always) ---
+        # --- Plot Histograms  ---
         h1 = ax.hist(data_orig, bins=70, density=True, alpha=0.3, color=colors[0])
         h2 = ax.hist(data_rec,  bins=70, density=True, alpha=0.3, color=colors[1])
         h3 = ax.hist(data_gen,  bins=70, density=True, alpha=0.3, color=colors[2])
 
-        # --- Only Original gets a KDE Fit ---
+        # --- Only Original gets a KDE Fit for better visualization---
         kde = gaussian_kde(data_orig)
         xs = np.linspace(min(data_orig), max(data_orig), 300)
         p, = ax.plot(xs, kde(xs), color=colors[0], lw=2)
 
-        # Only add this handle once (subplot 1)
         if subplot == 1:
             legend_handles.extend([
                 plt.Line2D([0], [0], color=colors[0], lw=2),   # original fit
@@ -289,8 +288,6 @@ def plot_bond_angle_kde_only(dist_original, dist_rec, dist_gen,
                             bw_method=None, npoints=400, xlim_quantiles=(0.5, 99.5)):
     """
     KDE-only plot: only smooth KDE lines (no histogram).
-    bw_method: None/"scott"/"silverman" or float
-    xlim_quantiles: robust shared x-range based on combined data
     """
 
     (r1_o, r2_o, ang_o) = dist_original
