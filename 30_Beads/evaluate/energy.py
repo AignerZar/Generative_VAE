@@ -1,6 +1,7 @@
 """
 File to evalutate the ernergy
 """
+"""
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -65,3 +66,5 @@ def compute_energy_distribution_generated(model, n_samples, latent_dim, P, num_a
         x = denorm_func(x_gen[i]).reshape(P, num_atoms, 3)
         energies.append(compute_energy_sample(x))
     return np.array(energies)
+
+"""
