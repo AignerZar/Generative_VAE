@@ -6,12 +6,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
-from graph_h2o import build_edge_index, build_node_features
+from graph_h2o import build_node_features
 
 ############################## E(n)-equivariant Graph Convolution Layers ########################################
 class EGCL(nn.Module):
-    # E(n) invariant CNN 
-    def __init__(self, in_dim, hidden_dim):
+    """E(n) Equivariant Graph COnvolutional Layer (EGCL)
+
+    This class and the layers inside process the node features and coordinates while the goal is to preserve the symmetry
+    and geometric equivariance based on inter nodal distances
+
+    Args:
+        in_dim (int): Input dimension of the node features
+        hidden_dim (int): Dimension of the hidden layers used inside the MLP
+    """
+
+    def __init__(self, in_dim: int, hidden_dim: int):
         super().__init__()
         self.phi_e = nn.Sequential(
             nn.Linear(2 * in_dim + 1, hidden_dim),
@@ -24,7 +33,18 @@ class EGCL(nn.Module):
             nn.ReLU()
         )
     
-    def forward(self, h, pos, edge_index):
+    def forward(self, h: torch.Tensor, pos: torch.Tensor, edge_index: torch.Tensor)->tuple[torch.Tensor, torch.Tensor]:
+        """Massage passing and node-update step
+
+        Args:
+            h: Node feature tensor, shape (B, N, in_dim)
+            pos: 3D coordinates tensor, shape (B, N, 3)
+            edge_index: Tensor with all the edges, shape (2, Edges)
+
+        Returns:
+            h_out: Updates node feature tensor, shape (B, N, in_dim)
+            pos: Unchanges or updated 3D coordinates
+        """
         src, dst = edge_index
 
         h_src = h[:, src, :] # start node
@@ -52,15 +72,28 @@ class EGCL(nn.Module):
 
 ############################## Encoder Class ########################################
 class Encoder(nn.Module):
+    """Encoder class for the Variational Autoencoder (VAE)
+
+    The encoder uses EGCL layers to project PIMC configurations into a latent space. The goal is to reconstruct 3D positions and generate different node features.
+
+    Args:
+        latent_dim (int): Dimension of the latent space
+        P (int): Number of beads per configuration
+        num_atoms (int): Number of atoms per molecule
+        edge_index (torch.Tensor): Tensor with all the edges, shape (2, Edges)
+        node_feat_dim (int): Number of coordinates per atoms, xyz coordinates
+        hidden_dim (int): Dimension of the hidden space
+        num_layers (int): Number of EGCL layers inside of the encoder
+    """
     def __init__(
             self, 
-            latent_dim, 
-            P, 
-            num_atoms, 
-            edge_index, 
-            node_feat_dim=3, 
-            hidden_dim=64, 
-            num_layers=6
+            latent_dim: int, 
+            P: int, 
+            num_atoms: int, 
+            edge_index: torch.Tensor, 
+            node_feat_dim: int = 3, 
+            hidden_dim: int = 64, 
+            num_layers: int = 6
         ): 
             super().__init__()
             self.P = P
@@ -77,7 +110,17 @@ class Encoder(nn.Module):
             self.fc_mu = nn.Linear(hidden_dim, latent_dim)
             self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
 
-    def forward(self, x_flat):
+    def forward(self, x_flat: torch.Tensor)->tuple[torch.Tensor, torch.Tensor]:
+        """Mapping the input data to the latent space distribution
+
+        Args:
+            x_flat (torch.Tensor): Flattend input data, shape: (B, P * num_atoms * 3)
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: 
+                mu: Mean vector of the latent distribution, shape (B, latent_dim)
+                logvar: Log-variance vector of the latent distribution, shape (B, latent_dim)
+        """
         B = x_flat.size(0)
         pos = x_flat.view(B, self.P * self.num_atoms, 3)
 
@@ -99,20 +142,34 @@ class Encoder(nn.Module):
 
 ################################# Decoder Class ########################################
 class Decoder(nn.Module):
+    """Decoder class for the Variational Autoencoder (VAE).
+
+    Samples from the latent space to produce new PIMC configurations
+
+    Args:
+        latent_dim (int): Dimension of the latent space
+        P (int): Number of beads per configuration
+        num_atoms (int): Number of atoms per molecule
+        edge_index (torch.Tensor): Tensor with all the edges, shape (2, Edges)
+        node_feat_dim (int): Number of coordinates per atoms, xyz coordinates
+        hidden_dim (int): Dimension of the hidden space
+        num_layers (int): Number of EGCL layers inside of the encoder 
+    """
     def __init__(
             self, 
-            latent_dim, 
-            P, 
-            num_atoms, 
-            edge_index, 
-            node_feat_dim=3,
-            hidden_dim=64, 
-            num_layers=6
+            latent_dim: int, 
+            P: int, 
+            num_atoms: int, 
+            edge_index: torch.Tensor, 
+            node_feat_dim: int = 3,
+            hidden_dim: int = 64, 
+            num_layers: int = 6
         ):
             super().__init__()
 
             self.P = P
             self.num_atoms = num_atoms
+            self.N = P * num_atoms
             self.node_feat_dim = node_feat_dim
             self.hidden_dim = hidden_dim
 
@@ -131,7 +188,15 @@ class Decoder(nn.Module):
                 nn.Linear(hidden_dim, 3),
             )
 
-    def forward(self, z):
+    def forward(self, z: torch.Tensor)-> torch.Tensor:
+        """Decodes the latent space back into a flattend PIMC configuration
+
+        Args:
+            z (torch.Tensor): Latent vectors sampled from VAE space
+
+        Returns:
+            torch.Tensor: Reconstructed flattened PIMC configuration, shape (B, P * num_atoms * 3)
+        """
         B = z.size(0)
         device = z.device
 
@@ -152,16 +217,28 @@ class Decoder(nn.Module):
 
 ################################## VAE Class ########################################
 class VAE(nn.Module):
+    """VAE class 
+
+    Architecture of the Variational Autoencoder (VAE) for sampling and producing new PIMC configurations
+
+    Args:
+        latent_dim (int): Dimension of the latent space
+        P (int): NUmber of beads per configuration
+        num_atoms (int): Number of atoms per molecule
+        edge_index (torch.Tensor): Tensor with all the edges, shape (2, Edges)
+        ode_feat_dim (int): Number of coordinates per atoms, xyz coordinates
+        hidden_dim (int): Dimension of the hidden space
+        num_layers (int): Number of EGCL layers inside of the encoder
+    """
     def __init__(
             self, 
-            input_dim, 
-            latent_dim, 
-            P, 
-            num_atoms, 
-            edge_index,
-            node_feat_dim=3,
-            hidden_dim=64,
-            num_layers=6,
+            latent_dim: int, 
+            P: int, 
+            num_atoms: int, 
+            edge_index: torch.Tensor,
+            node_feat_dim: int = 3,
+            hidden_dim: int = 64,
+            num_layers: int = 6,
         ):
             super().__init__()
 
@@ -185,13 +262,34 @@ class VAE(nn.Module):
                 num_layers=num_layers,
             )
     # reparametrize function to make it trainable with the backpropagation  
-    def reparameterize(self, mu, logvar):
+    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor)-> torch.Tensor:
+        """Applying the reparametrization trick to perform latent sampling
+
+        Args:
+            mu (torch.Tensor): Mean vector of latent space
+            logvar (torch.Tensor): Log-variance vector of latent space
+
+        Returns:
+            z (torch.Tensor): Sampled latent vector z, shape (B, latent_dim)
+        """
         std = torch.exp(0.5 * logvar)
         # random value
         eps = torch.randn_like(std)
-        return mu + eps * std
+        z = mu + eps *std
+        return z
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor)-> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Forward pass through the VAE: Input -> Encoder -> Latent Space -> Decoder -> Output
+
+        Args:
+            x (torch.Tensor): Flattened input PIMC configurations, shape (B, num_atoms * P * 3)
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                x_hat: Reconstructed PIMC configuration, shape (B, P * num_atoms * 3)
+                mu: Latent mean vector, shape (B, latent_dim)
+                logvar: Log-variance vector, shape (B, latent_dim)
+        """
         mu, logvar = self.encoder(x)
         z = self.reparameterize(mu, logvar)
         x_hat = self.decoder(z)
@@ -200,15 +298,30 @@ class VAE(nn.Module):
 
 ################################## Loss Function ########################################
 def vae_loss(
-        x, x_hat, mu, logvar, beta
-):
+        x: torch.Tensor, x_hat: torch.Tensor, mu: torch.Tensor, logvar:torch.Tensor, beta:float
+)-> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Function to compute the loss of the VAE
+
+    Args:
+        x (torch.Tensor): Input PIMC configuration
+        x_hat (torch.Tensor): Reconstructed output PIMC configuration
+        mu (torch.Tensor): Mean vector of latent space
+        logvar (torch.Tensor): Log-variance vector of latent space
+        beta (float): Parameter defining the influence of the KL divergence
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            total_loss: Total loss 
+            recon_loss: Reconstruction loss defined by the MSE loss
+            kl_div: Regularization loss defined by the KL divergence
+    """
     B = x.size(0)
     device = x.device
 
     # reconstruction loss
     recon_loss = F.mse_loss(x_hat, x, reduction='sum') / B 
 
-    # reparametrization loss
+    # regularization loss -> regularization oder representation loss? Im Stats VU wars representation loss ?
     kl_div = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / B
     total_loss = recon_loss + beta * kl_div
 
@@ -216,7 +329,22 @@ def vae_loss(
 
 
 ################################## Train Function ##########################################
-def train(model, train_loader, val_loader, optimizer, config):
+def train(model: nn.Module, train_loader, val_loader, optimizer:  torch.optim.Optimizer, config): #-> list[tuple[float, float]]:
+    """Function to train and validate the VAE over a defined number of epochs
+
+    For each epoch the function trains the VAE on all batches, all the training batches (train loader) 
+    and then validates over all the validation batches (val_loader)
+
+    Args:
+        model (nn.Module): Model which sould be trained here the VAE
+        train_loader (Dataloader): Training data
+        val_loader (Dataloader): Validation data
+        optimizer (torch.optim.Optimizer): Optimizer used to update the parameters of the model
+        config (_type_): Configuration file containing different informations like the epoch size or the number of beads per configuration
+
+    Returns:
+        _type_: _description_
+    """
     loss_history = []
     for epoch in range(config.n_epochs):
         model.train()
@@ -256,7 +384,14 @@ def train(model, train_loader, val_loader, optimizer, config):
     return loss_history
 
 ##################################### Function to plot the loss function ########################################################
-def plot_loss(loss_history, outfile="loss_30Beads.pdf"):
+def plot_loss(loss_history: list, outfile: str = "loss_30Beads.pdf"):
+    """Function to plot the validation and training loss
+    Both loss functions should converge to the same value 
+
+    Args:
+        loss_history (list): Array of the training and validation loss
+        outfile (str, optional): Name of the plot. Defaults to "loss_30Beads.pdf".
+    """
     loss_history = np.array(loss_history)
     plt.figure(figsize=(10,5))
     plt.plot(loss_history[:,1], label=r"Validation Loss", linewidth=0.8)

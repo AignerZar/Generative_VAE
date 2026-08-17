@@ -42,7 +42,7 @@ val_loader = DataLoader(TensorDataset(val_data), batch_size=config.batch_size, s
 
 edge_index = build_edge_index(P, num_atoms).to(config.device)
 
-model = VAE(config.input_dim, config.latent_dimension, P, num_atoms, edge_index).to(config.device)
+model = VAE(latent_dim=config.input_dim, P=P, num_atoms=num_atoms, edge_index=edge_index).to(config.device)
 optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
 loss_history = train(model, train_loader, val_loader, optimizer, config)
