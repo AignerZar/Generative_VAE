@@ -29,6 +29,7 @@ mean = train_raw.mean(axis=0)
 std = train_raw.std(axis=0)
 std = np.where(std == 0, 1.0, std)
 
+# normalization still needs to be adjusted here
 train_norm = (train_raw - mean) / std
 val_norm = (val_raw - mean) / std
 
@@ -42,7 +43,8 @@ val_loader = DataLoader(TensorDataset(val_data), batch_size=config.batch_size, s
 
 edge_index = build_edge_index(P, num_atoms).to(config.device)
 
-model = VAE(latent_dim=config.input_dim, P=P, num_atoms=num_atoms, edge_index=edge_index).to(config.device)
+# fehler noch ausbesser input_dim statt latent_dim geschrieben !!!!!!!!!
+model = VAE(latent_dim=config.latent_dimension, P=P, num_atoms=num_atoms, edge_index=edge_index).to(config.device)
 optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
 loss_history = train(model, train_loader, val_loader, optimizer, config)

@@ -3,12 +3,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 ########################################## Function to compute bond lengths #################################################################
-def compute_bond_lengths(x):
-    """
-    x shape: (P, 3, 3)
-    returns two arrays:
-        r1: O-H1 distances
-        r2: O-H2 distances
+def compute_bond_lengths(
+        x: np.ndarray
+        ) -> tuple[np.ndarray, np.ndarray]:
+    """Function to compute the bond lengths for each bead.
+
+    Function assumes the atom ordering [H1, O, H2]
+
+    Args:
+        x (np.ndarray): Cartesian coordinates
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]:
+            r1: Bond length between H1 and O
+            r2: Bond length between H2 and O
     """
     O  = x[:,1,:]
     H1 = x[:,0,:]
@@ -20,10 +28,20 @@ def compute_bond_lengths(x):
 
 
 ########################################### Function to compute the angle ###################################################################
-def compute_angle(a, b, c):
-    """
-    Computes angle ABC, in radians
-    a,b,c: (3,)
+def compute_angle(
+        a: np.ndarray, 
+        b: np.ndarray,
+        c: np.ndarray
+        ) -> float:
+    """Function to compute the angle of the H2O molecule
+
+    Args:
+        a (np.ndarray): Cartesian coordinate of first atom
+        b (np.ndarray): Cartesian coordinate of second atom
+        c (np.ndarray): Cartesian coordinate of third atom
+
+    Returns:
+        float: Angle of the molecule in radians
     """
     ba = a - b
     bc = c - b
@@ -32,10 +50,16 @@ def compute_angle(a, b, c):
 
 
 ############################################# Function to compute angle distribution ###########################################################
-def compute_angle_distribution(x):
-    """
-    x shape: (P, 3, 3)
-    Returns: list of angles (in degrees)
+def compute_angle_distribution(
+        x: np.ndarray
+        ) -> np.ndarray:
+    """Function to compute the angle of the H2O molecule for every PIMC bead 
+
+    Args:
+        x (np.ndarray): Cartesian coordinates
+
+    Returns:
+        np.ndarray: H2O angles in degrees
     """
     O  = x[:,1,:]
     H1 = x[:,0,:]
@@ -48,7 +72,34 @@ def compute_angle_distribution(x):
     return np.array(angles)
 
 ############################################### Function to obtain distributions #######################################################################
-def get_distributions(data_tensor, P, num_atoms, model=None, mode="original", n_samples=3500, device="cpu", denorm_func=None):
+def get_distributions(
+        data_tensor: torch.Tensor, 
+        P: int, 
+        num_atoms: int, 
+        model = None, 
+        mode = "original", 
+        n_samples: int = 3500, 
+        device = "cpu", 
+        denorm_func = None
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Function to extract all the bond lengths and bond angles 
+
+    Args:
+        data_tensor (torch.Tensor): Dataset containing the PIMC configurations
+        P (int): Number of beads per configuration
+        num_atoms (int): Number of atoms per molecule
+        model (Optional[torch.nn.Module], optional): Trained VAE, needed if mode is set to reconstructed or generated. Defaults to None.
+        mode (str, optional): Source of the evaluated configurations, options are original reconstructed or generated. Defaults to "original".
+        n_samples (int, optional): Number of generated configurations if mode is generated. Defaults to 3500.
+        device (str, optional): Device used. Defaults to "cpu".
+        denorm_func (_type_, optional): Function to convert normalized coordinates back. Defaults to None.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray]: 
+            bond1: O - H1 Bond length
+            bond2: O - H2 Bond length
+            angles: H-O-H angle
+    """
     bond1 = []
     bond2 = []
     angles = []
@@ -131,3 +182,30 @@ def plot_bond_angle_distributions(dist_original, dist_rec, dist_gen, outfile="bo
     plt.tight_layout()
     plt.savefig(outfile)
     plt.show()
+
+
+############################################ Function to print the results ###################################################################
+def summary_table(dist_original, dist_recon, dist_generated, ddof=1):
+    quantities = ["O-H(1)", "O-H(2)", "H-O-H"]
+    datasets = [
+        ("Original", dist_original),
+        ("Reconstructed", dist_recon),
+        ("Generated", dist_generated),
+    ]
+
+    print(f"{'Quantity':10s} {'Dataset':15s} {'Mean':>10s} {'Std':>10s}")
+    print("-" * 49)
+
+    for i, quantity in enumerate(quantities):
+        for label, distributions in datasets:
+            values = np.asarray(distributions[i])
+
+            mean = np.mean(values)
+            std = np.std(values, ddof=ddof)
+
+            print(
+                f"{quantity:10s} "
+                f"{label:15s} "
+                f"{mean:10.5f} "
+                f"{std:10.5f}"
+            )

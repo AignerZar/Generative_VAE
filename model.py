@@ -20,18 +20,22 @@ class EGCL(nn.Module):
         hidden_dim (int): Dimension of the hidden layers used inside the MLP
     """
 
-    def __init__(self, in_dim: int, hidden_dim: int):
-        super().__init__()
-        self.phi_e = nn.Sequential(
-            nn.Linear(2 * in_dim + 1, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
-        )
-        self.phi_h = nn.Sequential(
-            nn.Linear(hidden_dim, in_dim),
-            nn.ReLU()
-        )
+    def __init__(
+            self, 
+            in_dim: int, 
+            hidden_dim: int
+        ):
+            super().__init__()
+            self.phi_e = nn.Sequential(
+                nn.Linear(2 * in_dim + 1, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU()
+            )
+            self.phi_h = nn.Sequential(
+                nn.Linear(hidden_dim, in_dim),
+                nn.ReLU()
+            )
     
     def forward(self, h: torch.Tensor, pos: torch.Tensor, edge_index: torch.Tensor)->tuple[torch.Tensor, torch.Tensor]:
         """Massage passing and node-update step
