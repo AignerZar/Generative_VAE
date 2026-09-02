@@ -3,9 +3,16 @@
 GitHub Repository for a generative neural network, more precisely a Variational Autoencoder (VAE), to sample Path Integral Monte Carlo configurations. 
 By the use of those PIMC simulations it is possible to investigate different properties of quantum mechanical particles by mapping those particles onto a chain of beads connected by springs.
 
-## Input
+## PIMC configurations
 For the training and validation dataset, PIMC configurations are used. Those samples were calculated and generated beforehand by using the PIMC code, developed by Michael Hütter.
 The PIMC configurations are computed for H2O with different number of beads per molecule. Whereas here, a H2O molecule was used as an input. An example of such an input sample can be found in file "H2O_30beads.csv".
+
+## Defining the input parameters
+In the file "config.py" various variables are defined and used, dependent on the input dataset and the architecture of the network, this file needs to be adjusted properly.
+
+| Links | Zentriert | Rechts |
+| :--- | :---: | ---: |
+| Text | Text | 123 |
 
 ## Workflow
 1. Clone the whole repository -> includes input data for training and validation or use your own configurations to train the VAE
