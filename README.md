@@ -10,9 +10,28 @@ The PIMC configurations are computed for H2O with different number of beads per 
 ## Defining the input parameters
 In the file "config.py" various variables are defined and used, dependent on the input dataset and the architecture of the network, this file needs to be adjusted properly.
 
-| Links | Zentriert | Rechts |
+| Variable | Name and Usage | Datatype |
 | :--- | :---: | ---: |
-| Text | Text | 123 |
+| P | Number of beads per configurations (can be defined when training the PIMC network) | int |
+| num_atoms | Number of atoms per molecule | int |
+| batch_size | Number of samples in one batch | int |
+| Input_dim | Dimension of the input data (P * num_atoms * 3) | int |
+| Latent_dim | Dimension of the latent space | int |
+| Learning_rate | Learning rate, defines the step size during SGD | float |
+| Validation_split | How much percent should be in the validation set | float |
+| device | Device on which the algorithm and network should run | - |
+| ae_epochs | How many epochs the Autoencoder should be trained | int |
+| ae_learning_rate | Learning rate of the Autoencoder | float |
+|evaluation_batch_size | How many samples should be in one batch for the evaluation | int |
+|n_epochs | How many epochs the VAE should be trained | int |
+| beta | Factor which determines the influence of the KL loss | float |
+| beta_max | Factor which determines the influence of the KL loss for a progressive beta | float|
+| gamma | Factor which determines the influence of the geometry loss | - |
+| vae_learning_rate | Learning rate of the VAE | float |
+|kl_warmup_epochs | How long it should take till beta reaches maximal value, for progressive beta | int |
+| num_samples | How many new configurations should be produced | - |
+
+
 
 ## Workflow
 1. Clone the whole repository -> includes input data for training and validation or use your own configurations to train the VAE
