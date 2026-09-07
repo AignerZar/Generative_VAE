@@ -1,211 +1,161 @@
-import torch
-import numpy as np
+""" 
+In this code all functions and so on are defined used for the evaluation of the VAE
+"""
+from pathlib import Path
+from typing import Dict
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-########################################## Function to compute bond lengths #################################################################
-def compute_bond_lengths(
-        x: np.ndarray
-        ) -> tuple[np.ndarray, np.ndarray]:
-    """Function to compute the bond lengths for each bead.
-
-    Function assumes the atom ordering [H1, O, H2]
-
-    Args:
-        x (np.ndarray): Cartesian coordinates
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]:
-            r1: Bond length between H1 and O
-            r2: Bond length between H2 and O
-    """
-    O  = x[:,1,:]
-    H1 = x[:,0,:]
-    H2 = x[:,2,:]
-
-    r1 = np.linalg.norm(O - H1, axis=1)
-    r2 = np.linalg.norm(O - H2, axis=1)
-    return r1, r2
-
-
-########################################### Function to compute the angle ###################################################################
-def compute_angle(
-        a: np.ndarray, 
-        b: np.ndarray,
-        c: np.ndarray
-        ) -> float:
-    """Function to compute the angle of the H2O molecule
-
-    Args:
-        a (np.ndarray): Cartesian coordinate of first atom
-        b (np.ndarray): Cartesian coordinate of second atom
-        c (np.ndarray): Cartesian coordinate of third atom
-
-    Returns:
-        float: Angle of the molecule in radians
-    """
-    ba = a - b
-    bc = c - b
-    cosang = np.dot(ba, bc) / (np.linalg.norm(ba)*np.linalg.norm(bc))
-    return np.arccos(np.clip(cosang, -1.0, 1.0))
-
-
-############################################# Function to compute angle distribution ###########################################################
-def compute_angle_distribution(
-        x: np.ndarray
-        ) -> np.ndarray:
-    """Function to compute the angle of the H2O molecule for every PIMC bead 
-
-    Args:
-        x (np.ndarray): Cartesian coordinates
-
-    Returns:
-        np.ndarray: H2O angles in degrees
-    """
-    O  = x[:,1,:]
-    H1 = x[:,0,:]
-    H2 = x[:,2,:]
-
-    angles = []
-    for i in range(len(O)):
-        ang = compute_angle(H1[i], O[i], H2[i])
-        angles.append(np.degrees(ang))
-    return np.array(angles)
-
-############################################### Function to obtain distributions #######################################################################
-def get_distributions(
-        data_tensor: torch.Tensor, 
-        P: int, 
-        num_atoms: int, 
-        model = None, 
-        mode = "original", 
-        n_samples: int = 3500, 
-        device = "cpu", 
-        denorm_func = None
-        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Function to extract all the bond lengths and bond angles 
-
-    Args:
-        data_tensor (torch.Tensor): Dataset containing the PIMC configurations
-        P (int): Number of beads per configuration
-        num_atoms (int): Number of atoms per molecule
-        model (Optional[torch.nn.Module], optional): Trained VAE, needed if mode is set to reconstructed or generated. Defaults to None.
-        mode (str, optional): Source of the evaluated configurations, options are original reconstructed or generated. Defaults to "original".
-        n_samples (int, optional): Number of generated configurations if mode is generated. Defaults to 3500.
-        device (str, optional): Device used. Defaults to "cpu".
-        denorm_func (_type_, optional): Function to convert normalized coordinates back. Defaults to None.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: 
-            bond1: O - H1 Bond length
-            bond2: O - H2 Bond length
-            angles: H-O-H angle
-    """
-    bond1 = []
-    bond2 = []
-    angles = []
-
-    if mode == "original":
-        iterator = range(len(data_tensor))
-        def get_x(i):
-            x = denorm_func(data_tensor[i].cpu().numpy())
-            return x.reshape(P, num_atoms, 3)
-
-    elif mode == "reconstructed":
-        model.eval()
-        iterator = range(len(data_tensor))
-        def get_x(i):
-            with torch.no_grad():
-                x_flat = data_tensor[i].unsqueeze(0).to(device)
-                x_hat, _, _ = model(x_flat)
-                x = denorm_func(x_hat.squeeze(0).cpu().numpy())
-                return x.reshape(P, num_atoms, 3)
-
-    elif mode == "generated":
-        model.eval()
-        with torch.no_grad():
-            z = torch.randn(n_samples, model.encoder.fc_mu.out_features).to(device)
-            x_gen = model.decoder(z).cpu().numpy()
-
-        iterator = range(n_samples)
-        def get_x(i):
-            x = denorm_func(x_gen[i])
-            return x.reshape(P, num_atoms, 3)
-
-    for i in iterator:
-        x = get_x(i)
-        r1, r2 = compute_bond_lengths(x)
-        bond1.extend(r1)
-        bond2.extend(r2)
-        angles.extend(compute_angle_distribution(x))
-
-    return np.array(bond1), np.array(bond2), np.array(angles)
-
-
-####################################################### Functions for plots ##################################################################################
 font1 = {'family':'sans-serif','color':'black','size':12}
 font2 = {'family':'sans-serif','color':'black','size':20}
 
 plt.rcParams['text.usetex'] = True #LaTeX
 
-def plot_bond_angle_distributions(dist_original, dist_rec, dist_gen, outfile="bond_angle_distributions_30Beads_geomloss_long.pdf"):
-    (r1_o, r2_o, ang_o) = dist_original
-    (r1_r, r2_r, ang_r) = dist_rec
-    (r1_g, r2_g, ang_g) = dist_gen
-
-    plt.figure(figsize=(14,5))
-
-    # ---- Bond Lengths: O-H1 ----
-    plt.subplot(1,3,1)
-    plt.hist(r1_o, bins=40, density=True, alpha=0.6, label=r"Original data of $\mathrm{H_2O}$")
-    plt.hist(r1_r, bins=40, density=True, alpha=0.6, label=r"Reconstructed data of $\mathrm{H_2O}$")
-    plt.hist(r1_g, bins=40, density=True, alpha=0.6, label=r"Generated data of $\mathrm{H_2O}$")
-    plt.title(r"$\mathrm{O-H(1)}$  Bond Length Distribution")
-    plt.xlabel(r"Bond length [Å]")
-    plt.legend()
-
-    # ---- Bond Lengths: O-H2 ----
-    plt.subplot(1,3,2)
-    plt.hist(r2_o, bins=40, density=True, alpha=0.6, label=r"Original data of $\mathrm{H_2O}$")
-    plt.hist(r2_r, bins=40, density=True, alpha=0.6, label=r"Reconstructed data of $\mathrm{H_2O}$")
-    plt.hist(r2_g, bins=40, density=True, alpha=0.6, label=r"Generated data of $\mathrm{H_2O}$")
-    plt.title(r"$\mathrm{O-H(2)}$ Bond Length Distribution")
-    plt.xlabel(r"Bond length [Å]")
-
-    # ---- Angles ----
-    plt.subplot(1,3,3)
-    plt.hist(ang_o, bins=40, density=True, alpha=0.6, label=r"Original data of $\mathrm{H_2O}$")
-    plt.hist(ang_r, bins=40, density=True, alpha=0.6, label=r"Reconstruced data of $\mathrm{H_2O}$")
-    plt.hist(ang_g, bins=40, density=True, alpha=0.6, label=r"Gemerated data of $\mathrm{H_2O}$")
-    plt.title(r"$\mathrm{H-O-H}$ Angle Distribution")
-    plt.xlabel(r"Angle [deg]")
-
-    plt.tight_layout()
-    plt.savefig(outfile)
-    plt.show()
+Geometry = Dict[str, np.ndarray]
 
 
-############################################ Function to print the results ###################################################################
-def summary_table(dist_original, dist_recon, dist_generated, ddof=1):
-    quantities = ["O-H(1)", "O-H(2)", "H-O-H"]
-    datasets = [
-        ("Original", dist_original),
-        ("Reconstructed", dist_recon),
-        ("Generated", dist_generated),
-    ]
+def physical_coordinates(
+    normalized_flat: torch.Tensor,
+    global_scale: float,
+    P: int,
+    num_atoms: int,
+) -> np.ndarray:
+    """Function to convert the coordinates back to obtain correct physical results
 
-    print(f"{'Quantity':10s} {'Dataset':15s} {'Mean':>10s} {'Std':>10s}")
-    print("-" * 49)
+    Args:
+        normalized_flat (torch.Tensor): normalized data which should be back transformed
+        global_scale (float): Global scale factor used for normalization
+        P (int): Number of beads per configuration
+        num_atoms (int): Number of atoms per molecule
 
-    for i, quantity in enumerate(quantities):
-        for label, distributions in datasets:
-            values = np.asarray(distributions[i])
+    Returns:
+        np.ndarray: denormalized coordinates
+    """
+    return (
+        normalized_flat.numpy().reshape(-1, P, num_atoms, 3)
+        * global_scale
+    )
 
-            mean = np.mean(values)
-            std = np.std(values, ddof=ddof)
 
+def geometry_distributions(coordinates: np.ndarray) -> Geometry:
+    """Function to compute the geometry of the results and the original input
+
+    Args:
+        coordinates (np.ndarray): Coordinates of the atoms 
+
+    Returns:
+        Geometry: Returning bond lengths and bond angle
+    """
+    H1 = coordinates[:, :, 0, :]
+    O = coordinates[:, :, 1, :]
+    H2 = coordinates[:, :, 2, :]
+
+    vector_1 = H1 - O
+    vector_2 = H2 - O
+    bond_1 = np.linalg.norm(vector_1, axis=-1)
+    bond_2 = np.linalg.norm(vector_2, axis=-1)
+    cosine = np.sum(vector_1 * vector_2, axis=-1) / np.maximum(
+        bond_1 * bond_2, 1e-12
+    )
+    angle = np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
+    hydrogen_distance = np.linalg.norm(H1 - H2, axis=-1)
+
+    return {
+        "O-H1": bond_1.reshape(-1),
+        "O-H2": bond_2.reshape(-1),
+        "H-O-H": angle.reshape(-1),
+        "H-H": hydrogen_distance.reshape(-1),
+    }
+
+
+def print_geometry_summary(distributions: Dict[str, Geometry]) -> None:
+    """Function to print out the computed statistics -> bond lengths and bond angles
+
+    Args:
+        distributions (Dict[str, Geometry]): Obtained and computed geometries
+    """
+    print("\nGeometry summary")
+    print(f"{'Quantity':10s} {'Dataset':27s} {'Mean':>11s} {'Std':>11s}")
+    print("-" * 63)
+
+    for quantity in ("O-H1", "O-H2", "H-O-H", "H-H"):
+        for label, geometry in distributions.items():
+            values = geometry[quantity]
             print(
-                f"{quantity:10s} "
-                f"{label:15s} "
-                f"{mean:10.5f} "
-                f"{std:10.5f}"
+                f"{quantity:10s} {label:27s} "
+                f"{values.mean():11.5f} {values.std(ddof=1):11.5f}"
             )
+
+
+def plot_geometry_distributions(
+    distributions: Dict[str, Geometry],
+    output_file: str,
+) -> None:
+    """Function to plot the different geometry distributoions 
+
+    Args:
+        distributions (Dict[str, Geometry]): Various distributions inside of a dictionary, computed above
+        output_file (str): Name of the file which should contain the results
+    """
+    plotted_labels = (
+        r"Validation targets",
+        #"Deterministic reconstruction",
+        r"Stochastic reconstruction",
+        r"Aggregated posterior",
+        #"Standard-normal prior",
+    )
+    colors = ("black", "tab:blue", "tab:orange")#, "tab:green")
+    quantities = (
+        ("O-H1", r"$\mathrm{O-H_1}$ bond length [Angstrom]"),
+        ("O-H2", r"$\mathrm{O-H_2}$ bond length [Angstrom]"),
+        ("H-O-H", r"$\mathrm{H-O-H}$ angle [degree]"),
+        #("H-H", "H-H distance [Angstrom]"),
+    )
+
+    figure, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    for axis, (quantity, x_label) in zip(axes, quantities):
+        plotted_values = [
+            distributions[label][quantity] for label in plotted_labels
+        ]
+        lower = min(np.quantile(values, 0.001) for values in plotted_values)
+        upper = max(np.quantile(values, 0.999) for values in plotted_values)
+        padding = 0.15 * max(upper - lower, 1e-6)
+        bins = np.linspace(lower - padding, upper + padding, 55)
+
+        for label, color in zip(plotted_labels, colors):
+            values = distributions[label][quantity]
+            if label == r"Validation targets":
+                axis.hist(
+                    values,
+                    bins=bins,
+                    density=True,
+                    alpha=0.25,
+                    color=color,
+                    label=label,
+                )
+            else:
+                axis.hist(
+                    values,
+                    bins=bins,
+                    density=True,
+                    histtype="step",
+                    linewidth=1.6,
+                    color=color,
+                    label=label,
+                )
+
+        axis.set_xlabel(x_label)
+        axis.set_ylabel(r"Probability density")
+        axis.grid(alpha=0.2)
+
+    axes[0].legend(fontsize=8)
+    figure.tight_layout()
+
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path)
+    figure.savefig(output_path.with_suffix(".png"), dpi=180)
+    plt.close(figure)

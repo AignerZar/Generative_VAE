@@ -1,12 +1,10 @@
-"""
-The following code contains the architecture of the VAE
-"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 from graph_h2o import build_node_features
+import config
 
 ############################## E(n)-equivariant Graph Convolution Layers ########################################
 class EGCL(nn.Module):
@@ -95,7 +93,7 @@ class Encoder(nn.Module):
             P: int, 
             num_atoms: int, 
             edge_index: torch.Tensor, 
-            node_feat_dim: int = 3, 
+            node_feat_dim: int = 4, 
             hidden_dim: int = 64, 
             num_layers: int = 6
         ): 
@@ -103,16 +101,26 @@ class Encoder(nn.Module):
             self.P = P
             self.num_atoms = num_atoms
             self.node_feat_dim = hidden_dim
+            self.N = P * num_atoms
+            self.global_dim = 256 # Number of N * hidden_dim
             self.register_buffer("edge_index", edge_index)
 
-            self.input_proj = nn.Linear(node_feat_dim, hidden_dim)
+            self.input_proj = nn.Linear(node_feat_dim + 3, hidden_dim)
             
             self.layers = nn.ModuleList([
                 EGCL(hidden_dim, hidden_dim) for _ in range(num_layers)
             ])
 
-            self.fc_mu = nn.Linear(hidden_dim, latent_dim)
-            self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
+            self.global_proj = nn.Sequential(
+                 nn.Linear(
+                      self.N * hidden_dim,
+                      self.global_dim,
+                    ),
+                    nn.ReLU(),
+            )
+
+            self.fc_mu = nn.Linear(self.global_dim, latent_dim)
+            self.fc_logvar = nn.Linear(self.global_dim, latent_dim)
 
     def forward(self, x_flat: torch.Tensor)->tuple[torch.Tensor, torch.Tensor]:
         """Mapping the input data to the latent space distribution
@@ -128,18 +136,21 @@ class Encoder(nn.Module):
         B = x_flat.size(0)
         pos = x_flat.view(B, self.P * self.num_atoms, 3)
 
-        h = build_node_features(B, self.P, self.num_atoms, x_flat.device)
-        h = self.input_proj(h)
+        node_features = build_node_features(B, self.P, self.num_atoms, x_flat.device)
+        encoder_input = torch.cat([node_features, pos], dim=-1)
+        h = self.input_proj(encoder_input)
 
         for i, layer in enumerate(self.layers):
             h, pos = layer(h, pos, self.edge_index)
 
            
 
-        h_mol = h.mean(dim=1)
+        h_flat = h.reshape(B, -1)
 
-        mu = self.fc_mu(h_mol)
-        logvar = self.fc_logvar(h_mol)
+        h_global = self.global_proj(h_flat)
+
+        mu = self.fc_mu(h_global)
+        logvar = self.fc_logvar(h_global)
 
         return mu, logvar
 
@@ -165,7 +176,7 @@ class Decoder(nn.Module):
             P: int, 
             num_atoms: int, 
             edge_index: torch.Tensor, 
-            node_feat_dim: int = 3,
+            node_feat_dim: int = 4,
             hidden_dim: int = 64, 
             num_layers: int = 6
         ):
@@ -179,7 +190,12 @@ class Decoder(nn.Module):
 
             self.register_buffer("edge_index", edge_index)
 
-            self.fc_global = nn.Linear(latent_dim, hidden_dim)
+            self.fc_global = nn.Sequential(
+                 nn.Linear(latent_dim, 256),
+                 nn.SiLU(),
+                 nn.Linear(256, self.N * hidden_dim),
+            )
+            #self.fc_global = nn.Linear(latent_dim, hidden_dim)
             self.node_emb  = nn.Linear(node_feat_dim, hidden_dim)
 
             self.layers = nn.ModuleList([EGCL(hidden_dim, hidden_dim) for _ in range(num_layers)])
@@ -205,8 +221,8 @@ class Decoder(nn.Module):
         device = z.device
 
         node_features = build_node_features(B, self.P, self.num_atoms, device)  # (B,N,3)
-        
-        g = self.fc_global(z).unsqueeze(1).repeat(1, self.N, 1)                # (B,N,H)
+
+        g = self.fc_global(z).view(B, self.N, self.hidden_dim)
         h = self.node_emb(node_features) + g                                  # (B,N,H)
 
         pos = torch.zeros(B, self.N, 1, device=device)
@@ -240,7 +256,7 @@ class VAE(nn.Module):
             P: int, 
             num_atoms: int, 
             edge_index: torch.Tensor,
-            node_feat_dim: int = 3,
+            node_feat_dim: int = 4,
             hidden_dim: int = 64,
             num_layers: int = 6,
         ):
@@ -282,7 +298,7 @@ class VAE(nn.Module):
         z = mu + eps *std
         return z
     
-    def forward(self, x: torch.Tensor)-> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, sample: bool = True)-> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass through the VAE: Input -> Encoder -> Latent Space -> Decoder -> Output
 
         Args:
@@ -295,7 +311,11 @@ class VAE(nn.Module):
                 logvar: Log-variance vector, shape (B, latent_dim)
         """
         mu, logvar = self.encoder(x)
-        z = self.reparameterize(mu, logvar)
+
+        if sample:
+            z = self.reparameterize(mu, logvar)     # VAE training
+        else:
+            z = mu      # AE training
         x_hat = self.decoder(z)
         return x_hat, mu, logvar
 
@@ -327,6 +347,11 @@ def vae_loss(
 
     # regularization loss -> regularization oder representation loss? Im Stats VU wars representation loss ?
     kl_div = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / B
+
+    # geometry loss
+    
+
+    # total loss
     total_loss = recon_loss + beta * kl_div
 
     return total_loss, recon_loss, kl_div
@@ -344,13 +369,18 @@ def train(model: nn.Module, train_loader, val_loader, optimizer:  torch.optim.Op
         train_loader (Dataloader): Training data
         val_loader (Dataloader): Validation data
         optimizer (torch.optim.Optimizer): Optimizer used to update the parameters of the model
-        config (_type_): Configuration file containing different informations like the epoch size or the number of beads per configuration
+        config : Configuration file containing different informations like the epoch size or the number of beads per configuration
 
     Returns:
-        _type_: _description_
+        loss history: All the losses of each epoch summed together to obtain the history of the loss
     """
     loss_history = []
     for epoch in range(config.n_epochs):
+        if config.kl_warmup_epochs <= 1:
+             beta = config.beta_max
+        else:
+             warumup_fraction = min(epoch / (config.kl_warmup_epochs -  1), 1.0)
+             beta = config.beta_max * warumup_fraction
         model.train()
         total_loss = total_recon = total_kl = 0
 
@@ -359,7 +389,7 @@ def train(model: nn.Module, train_loader, val_loader, optimizer:  torch.optim.Op
             optimizer.zero_grad()
 
             x_hat, mu, logvar = model(x_batch)
-            loss, recon_loss, kl_div = vae_loss(x_batch, x_hat, mu, logvar, beta=0.5)
+            loss, recon_loss, kl_div = vae_loss(x_batch, x_hat, mu, logvar, beta=beta)# beta ändern 
 
             loss.backward()
             optimizer.step()
@@ -369,6 +399,8 @@ def train(model: nn.Module, train_loader, val_loader, optimizer:  torch.optim.Op
             total_kl += kl_div.item()
 
         avg_loss = total_loss / len(train_loader)
+        avg_recon = total_recon / len(train_loader)
+        avg_kl = total_kl / len(train_loader)
 
         # Validation
         model.eval()
@@ -377,12 +409,12 @@ def train(model: nn.Module, train_loader, val_loader, optimizer:  torch.optim.Op
             for (x_batch,) in val_loader:
                 x_batch = x_batch.to(config.device)
                 x_hat, mu, logvar = model(x_batch)
-                loss, _, _ = vae_loss(x_batch, x_hat, mu, logvar, beta=0.5)
+                loss, _, _ = vae_loss(x_batch, x_hat, mu, logvar, beta=beta)
                 val_loss += loss.item()
 
         val_loss /= len(val_loader)
 
-        print(f"Epoch {epoch+1:03d}: TrainLoss={avg_loss:.3f}, ValLoss={val_loss:.3f}")
+        print(f"Epoch {epoch+1:03d}:Beta_{beta:.5f}, TrainLoss={avg_loss:.3f}, Recon={avg_recon:.3f}, KL={avg_kl:.3f}, ValLoss={val_loss:.3f}")
         loss_history.append((avg_loss, val_loss))
 
     return loss_history
