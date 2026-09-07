@@ -7,6 +7,18 @@ By the use of those PIMC simulations it is possible to investigate different pro
 For the training and validation dataset, PIMC configurations are used. Those samples were calculated and generated beforehand by using the PIMC code, developed by Michael Hütter.
 The PIMC configurations are computed for H2O with different number of beads per molecule. Whereas here, a H2O molecule was used as an input. An example of such an input sample can be found in file "H2O_30beads.csv".
 
+## Overview
+In this work a Variational Autoencoder (VAE) is introduced, whereas before training the actual VAE, a simpler Autoencoder (AE) is trained, whereas the trained weights of the AE were used as and loaded into the VAE, therefore we were able to introduce a two stages approach.
+
+It is important to denote, that the AE does not have to be trained from scratch each time the VAE is trained, only if changes in the architecture or the dimension of the latent space are done, the weights of the AE need to be retrained.
+
+### Autoencoder
+For the AE the same architecture as for the VAE was used, whereas only the loss function is much more simpler compared to the VAE. Because of the fact that the output is also computed by drawing random latent vectors $z$ from the latent space, therefore also no KL term or geometry loss is needed, leading to a much faster convergence of the loss function.
+
+### Variational Autoencoder
+The VAE is using the same architecture as the AE, whereas now for the sampling process the so called reparametrization trick was used, to be able to perform back propagation. Compared to the AE, the loss function of the VAE consisted of three different terms: The reconstruction term, the representation and the geometry par of the loss function.
+
+
 ## Defining the Input Parameters
 In the file "config.py" various variables are defined and used, dependent on the input dataset and the architecture of the network, this file needs to be adjusted properly.
 
