@@ -18,7 +18,7 @@ ae_epochs = 100
 ae_learning_rate = 1e-3
 
 evaluation_batch_size = 128
-n_epochs = 1000 # hier vielleicht besser 500 probieren?????
+n_epochs = 5000 # hier vielleicht besser 500 probieren?????
 beta = 0.01
 beta_max = 0.02
 gamma = 1.0

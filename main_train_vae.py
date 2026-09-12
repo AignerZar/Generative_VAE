@@ -9,7 +9,7 @@ import config
 from graph_h2o import build_edge_index
 from model import VAE
 from preprocessing import load_flat_data, load_preprocessed_splits
-from training import make_data_loaders, plot_loss, train_vae
+from training2 import make_data_loaders, plot_loss, train_vae, plot_geometry_metrics
 
 
 def main() -> None:
@@ -115,7 +115,12 @@ def main() -> None:
     if getattr(config, "save_loss_plot", True):
         plot_loss(
             history,
-            getattr(config, "vae_loss_plot", "outputs/plots/loss_vae.pdf"),
+            getattr(config, "vae_loss_plot", "outputs/plots/loss_vae.pdf"), start_epoch=50
+        )
+        plot_geometry_metrics(
+            history, 
+            getattr(config, "vae_geometry_plot", "outputs/plots/geometry_vae.pdf"),
+            start_epoch=50,
         )
 
 

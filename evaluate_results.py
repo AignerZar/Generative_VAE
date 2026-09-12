@@ -63,8 +63,13 @@ def geometry_distributions(coordinates: np.ndarray) -> Geometry:
     angle = np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
     hydrogen_distance = np.linalg.norm(H1 - H2, axis=-1)
 
+    #bond_1_mean = bond_1.mean(axis=1)
+    #bond_2_mean = bond_2.mean(axis=1)
+    #angle_mean = angle.mean(axis=1)
+    #hydrogen_distance_mean = hydrogen_distance.mean(axis=-1)
+
     return {
-        "O-H1": bond_1.reshape(-1),
+        "O-H1": bond_1.reshape(-1),#bond_1_mean,#
         "O-H2": bond_2.reshape(-1),
         "H-O-H": angle.reshape(-1),
         "H-H": hydrogen_distance.reshape(-1),
@@ -147,12 +152,18 @@ def plot_geometry_distributions(
                     label=label,
                 )
 
-        axis.set_xlabel(x_label)
-        axis.set_ylabel(r"Probability density")
+        axis.set_xlabel(x_label, fontsize=16, fontweight="bold")
+        axis.set_ylabel(r"Probability density", fontsize=16, fontweight="bold")
+        for tick in axis.get_xticklabels() + axis.get_yticklabels():
+            tick.set_fontweight("bold")
         axis.grid(alpha=0.2)
 
-    axes[0].legend(fontsize=8)
-    figure.tight_layout()
+    #axes[0].legend(fontsize=14, prop={"size": 14, "weight": "bold"})
+    handles, labels = axes[0].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.0), ncol=3, prop={"size": 14, "weight": "bold"}, frameon=False)
+
+    figure.tight_layout(rect=[0, 0.12, 1, 1])
+    #figure.tight_layout()
 
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)

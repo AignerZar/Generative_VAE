@@ -453,16 +453,155 @@ def plot_loss(history: LossHistory, output_file: str) -> None:
         history (LossHistory): History of the loss function (training and validation loss)
         output_file (str): Output file, lies in folder where also Plot should be stored
     """
+    # output_path = Path(output_file)
+    # output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # figure, axis = plt.subplots(figsize=(9, 5))
+    # axis.plot(history["train_loss"], label=r"Training loss")
+    # axis.plot(history["val_loss"], label=r"Validation loss")
+    # axis.set_xlabel(r"Epoch")
+    # axis.set_ylabel(r"Loss")
+    # axis.grid(alpha=0.2)
+    # axis.legend()
+    # figure.tight_layout()
+    # figure.savefig(output_path)
+    # plt.close(figure)
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    start_epoch = 50
+
+    epochs = np.arange(start_epoch + 1, len(history["train_loss"]) + 1)
+
+    train_loss = np.asarray(history["train_loss"])[start_epoch:]
+    val_loss = np.asarray(history["val_loss"])[start_epoch:]
+
+    reconstruction = np.asarray(history["reconstruction"])[start_epoch:]
+    kl = np.asarray(history["kl"])[start_epoch:]
+    geometry = np.asarray(history["geometry"])[start_epoch:]
+    bonds = np.asarray(history["bond geometry"])[start_epoch:]
+    angles = np.asarray(history["angle geometry"])[start_epoch:]
+
+    beta = np.asarray(history["beta"])[start_epoch:]
+    gamma = np.asarray(history["gamma"])[start_epoch:]
+
+    weighted_kl = beta * kl
+    weighted_geometry = gamma * geometry
+
+    # total loss
     figure, axis = plt.subplots(figsize=(9, 5))
-    axis.plot(history["train_loss"], label=r"Training loss")
-    axis.plot(history["val_loss"], label=r"Validation loss")
+
+    axis.plot(
+        epochs,
+        train_loss,
+        label=r"Training Loss"
+    )
+
     axis.set_xlabel(r"Epoch")
     axis.set_ylabel(r"Loss")
     axis.grid(alpha=0.2)
-    axis.legend()
+    axis.legend(fontsize=12)
+
     figure.tight_layout()
-    figure.savefig(output_path)
+
+    total_path = output_path.with_name(
+        f"{output_path.stem}_total_loss{output_path.suffix}"
+    )
+
+    figure.savefig(total_path)
     plt.close(figure)
+
+    # individual losses
+    figure, axis = plt.subplots(figsize=(9, 5))
+
+    axis.plot(
+        epochs,
+        reconstruction,
+        label=r"Reconstruction"
+    )
+
+    axis.plot(
+        epochs,
+        weighted_kl,
+        label=r"$\beta \cdot \mathrm{KL}$"
+    )
+
+    axis.plot(
+        epochs,
+        weighted_geometry,
+        label=r"$\gamma \cdot \mathcal{L}_{\mathrm{geom}}$"
+    )
+
+    axis.plot(
+        epochs,
+        gamma * bonds,
+        label=r"$\gamma \cdot \mathcal{L}_{\mathrm{bond}}$"
+    )
+
+    axis.plot(
+        epochs,
+        gamma * angles,
+        label=r"$\gamma \cdot \mathcal{L}_{\mathrm{angle}}$"
+    )
+
+    axis.set_xlabel(r"Epoch")
+    axis.set_ylabel(r"Loss contribution")
+    axis.grid(alpha=0.2)
+    axis.legend(fontsize=12)
+
+    figure.tight_layout()
+
+    components_path = output_path.with_name(
+        f"{output_path.stem}_components{output_path.suffix}"
+    )
+
+    figure.savefig(components_path)
+    plt.close(figure)
+
+    # losses_to_plot = {
+    #     "totale_loss": {
+    #         "train_loss": "Training loss",
+    #         "val_loss": "Validation loss",
+    #     },
+    #     "reconstruction": {
+    #         "reconstruction": "Reconstruction loss",
+    #     },
+    #     "kl": {
+    #         "kl": "KL divergence",
+    #     },
+    #     "geometry": {
+    #         "geometry": "Geometry loss",
+    #     },
+    #     "bond_geometry": {
+    #         "bond geometry": "Bond Geometry",
+    #     },
+    #     "angle_geometry": {
+    #         "angle geometry": "Angle Geometry",
+    #     },
+    # }
+
+    # for name, curves in losses_to_plot.items():
+    #     figure, axis = plt.subplots(figsize=(9, 5))
+
+    #     for history_key, label in curves.items():
+    #         axis.plot(
+    #             epochs,
+    #             history[history_key],
+    #             label=label,
+    #         )
+
+    #     axis.set_xlabel("Epoch")
+    #     axis.set_ylabel("Loss")
+
+    #     axis.set_xlim(left=1)
+
+    #     axis.grid(alpha=0.2)
+    #     axis.legend()
+    #     figure.tight_layout()
+
+    #     file_path = output_path.with_name(
+    #         f"{output_path.stem}_{name}{output_path.suffix}"
+    #     )
+
+    #     figure.savefig(file_path)
+    #     plt.close(figure)
